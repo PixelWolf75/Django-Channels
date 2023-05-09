@@ -1,0 +1,210 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+html,
+body {
+  min-height: 100vh;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.panel {
+  padding: 2em;
+  background: #fffb;
+}
+.panel.center {
+  margin: auto;
+}
+.panel.shadow {
+  box-shadow: 0 0 1rem black;
+}
+.panel.curve {
+  border-radius: 0.5rem;
+}
+.d-flex {
+  display: flex;
+}
+.d-flex.flex-column {
+  flex-direction: column;
+  position: relative;
+}
+.d-flex.flex-row {
+  flex-direction: row;
+}
+.d-flex.g-3 {
+  gap: 1.5rem;
+}
+.btn {
+  padding: 0.5rem;
+  border: 1px solid #888;
+  cursor: pointer;
+}
+.btn.btn-primary {
+  background: #aaf;
+  transition: 0.3s ease-in all;
+}
+.btn.btn-primary:hover {
+  background: #bbf;
+}
+.error {
+  color: red;
+  background: #fee;
+  padding: 0.5em;
+  margin: -1rem -2rem 0;
+}
+input[type="text"],
+input[type="password"] {
+  padding: 0.5em;
+  border: 1px solid #888;
+}
+.master {
+  display: flex;
+  flex-direction: row;
+  min-height: 92vh;
+}
+.master > :nth-child(1) {
+  width: 200px;
+  background: white;
+}
+.master > #Chat_Window {
+  flex: 1;
+  padding: 2rem;
+  background-size: cover;
+}
+.master > .side-menu {
+  width: 200px;
+  backdrop-filter: blur(1rem);
+  background: #fff2;
+  border-right: 1px solid #fff4;
+  box-shadow: 1rem 0 1rem #0004;
+}
+.master > .side-menu h2 {
+  background: #fff8;
+  margin: 0;
+  padding: 1rem;
+}
+.text-editor .ql-toolbar {
+  border-top-left-radius: 0.5rem;
+  overflow: hidden;
+  background: #fffd;
+  border-top-right-radius: 0.5rem;
+}
+.text-editor #chat-message-input {
+  border-bottom-left-radius: 0.5rem;
+  overflow: hidden;
+  background: #fffd;
+  border-bottom-right-radius: 0.5rem;
+}
+.post-btn {
+  color: white;
+  background: #0003;
+  width: 1.3rem;
+  border-radius: 50%;
+  border: 1px solid gray;
+  height: 1.3rem;
+  line-height: 0.6rem;
+  padding: 0.3rem;
+  text-align: center;
+  display: none;
+  font-size: 0.6em;
+  cursor: pointer;
+}
+.post-btn:hover {
+  background: #fff5;
+}
+.room_listing {
+  display: flex;
+  flex-direction: row;
+  gap: 1rem;
+  padding: 0.5rem 1rem;
+  transition: 0.3s background-color ease-in;
+  font-family: Arial;
+}
+.room_listing:hover {
+  background: #ddd5;
+}
+.room_listing + .room_listing {
+  margin-top: 0;
+}
+.room_listing .room_listing--icon {
+  border: 1px solid black;
+  border-radius: 50%;
+  width: 2rem;
+  height: 2rem;
+  aspect-ratio: 1;
+}
+.room_listing .room_listing--name {
+  font-weight: 900;
+}
+.room_listing .room_listing--text_stuff {
+  display: flex;
+  flex-direction: column;
+}
+div[data-role="chat-message"] {
+  background: white;
+  color: black;
+  padding: 1rem;
+  border-radius: 0.5em;
+  border: 1px solid grey;
+  width: 100%;
+}
+#my_brand {
+  position: fixed;
+  z-index: -1;
+  width: 100vw;
+}
+#my_brand img {
+  width: 100vw;
+}
+[data-role="extra-buttons"] {
+  position: relative;
+}
+[data-role="extra-buttons"] .button-row {
+  display: flex;
+  flex-direction: row;
+  background: #CCC;
+  border: 1px solid #333;
+  border-radius: 1em;
+  position: absolute;
+  right: 0.3rem;
+  top: 0.3rem;
+  gap: 0.5em;
+  align-items: center;
+  transition: 0.3s width ease;
+  width: 1.45em;
+  overflow: hidden;
+}
+[data-role="extra-buttons"] .button-row.open-state {
+  width: 5em;
+}
+[data-role="extra-buttons"] .button-row.open-state .post-btn {
+  display: block;
+}
+[data-role="extra-buttons"] .ellipsis {
+  display: flex;
+  flex-direction: row;
+  gap: 0.2em;
+  color: white;
+  height: 1.3rem;
+  line-height: 1rem;
+  align-items: center;
+  background: transparent;
+  border-radius: 50%;
+  border: 0;
+  aspect-ratio: 1;
+  justify-content: center;
+  cursor: pointer;
+}
+[data-role="extra-buttons"] .ellipsis > div {
+  border-radius: 50%;
+  width: 3px;
+  height: 3px;
+  font-size: 1px;
+  line-height: 1px;
+  background: black;
+  border: 0px solid red;
+}
+/*# sourceMappingURL=chat.css.map */

@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Eric Chat v1</title>
+    <link href="/static/chat/css/chat.css" rel="stylesheet"/>
+    <style>
+
+    </style>
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/chat/fav/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/chat/fav/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/chat/fav/favicon-16x16.png">
+    <link rel="manifest" href="/static/chat/fav/site.webmanifest">
+    <link rel="mask-icon" href="/static/chat/fav/safari-pinned-tab.svg" color="#5bbad5">
+    <link rel="shortcut icon" href="/static/chat/fav/favicon.ico">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <meta name="msapplication-config" content="/static/chat/fav/browserconfig.xml">
+    <meta name="theme-color" content="#ffffff">
+
+      <!-- our project just needs Font Awesome Solid + Brands -->
+  <link href="/static/chat/fontawesome-free-6.2.0-web/css/fontawesome.css" rel="stylesheet">
+  <link href="/static/chat/fontawesome-free-6.2.0-web/css/brands.css" rel="stylesheet">
+  <link href="/static/chat/fontawesome-free-6.2.0-web/css/solid.css" rel="stylesheet">
+</head>
+<body>
+<div class="master">
+    <div class="shadow">
+        <h2 style="margin: 0.75rem">{{ user_name }}'s Friends</h2>
+        {% for room, list_of_people in rooms_map.items %}
+        <div class="room_listing" onclick="open_room('{{room.id}}'|0)">
+
+            {% if list_of_people|length == 1 %}
+            <div class="room_listing--icon"></div>
+            <div class="room_listing--name">{{list_of_people.0.user.username}}</div>
+            {%else%}
+            <div class="room_listing--icon"></div>
+            <div class="room_listing--name">{{room.name}}</div>
+            <div class="room_listing--peoples">{{list_of_people}}</div>
+            {%endif%}
+
+        </div>
+        {% endfor %}
+    </div>
+    <div id="Chat_Window"><h2>Something here.</h2></div>
+</div>
+<template id="tmpChatBox">
+    <div class="d-flex flex-column ChatBox">
+        <button class="delete-button"><a href="#"><i class="fa fa-trash" ></i></a></button>
+        <div data-role="chat-message"></div>
+    </div>
+</template>
+<template id="tmpRoom">
+    <div class="d-flex flex-column g-3">
+        <div id="chat-log"></div>
+        <!--        <textarea id="chat-log" cols="100" rows="20" autocomplete="off"></textarea>-->
+        <input id="chat-message-input" type="text" size="100">
+        <input id="chat-message-submit" type="button" value="Send">
+    </div>
+</template>
+{{ user_name|json_script:"user_name"}}
+{{ histories|json_script:"histories"}}
+{{ room_maps|json_script:"room_maps"}}
+<script>
+    const username = JSON.parse(document.getElementById('user_name').textContent);
+    const roomMap = JSON.parse(document.getElementById('room_maps').textContent);
+    let room_history_list = JSON.parse(document.getElementById('histories').textContent);
+    let room_id_global;
+
+    /**
+     * Open a room
+     * @param room_id {number}
+     */
+    const chatSocket = new WebSocket
+    (
+        'ws://'
+        + window.location.host
+        + '/ws/chat/'
+        + '{{user_name}}'
+        + '/'
+    );
+
+    function open_room(room_id) {
+        console.log(`The room is ${room_id}`)
+        room_id_global = room_id
+        let tmpRoom = /** @type {HTMLTemplateElement} */ document.getElementById('tmpRoom');
+        let cloned = /** @type {HTMLDivElement} */ tmpRoom.content.cloneNode(true);
+        let main = document.getElementById('Chat_Window');
+        let chat_input = cloned.querySelector('#chat-message-input');
+        let btn_send = cloned.querySelector('#chat-message-submit');
+
+        chat_input.onkeyup = function (e) {
+            if (e.keyCode === 13) {  // enter, return
+                console.log("ENTER HIT, NOW SENDING")
+                document.querySelector('#chat-message-submit').click();
+            }
+        };
+        btn_send.onclick = function (e) {
+            const messageInputDom = document.querySelector('#chat-message-input');
+            const message = messageInputDom.value;
+            console.log("CHAT BUTTON SENDING")
+            chatSocket.send(JSON.stringify({
+                'room': room_id,
+                'message': message,
+                'type': 'chat_message'
+            }));
+            messageInputDom.value = '';
+        };
+
+        let div_dest = /** @type {HTMLDivElement} */ document.createElement('div');
+        div_dest.setAttribute("class", "d-flex flex-column g-3");
+
+        room_history_list[room_id].forEach(
+            /** @param his {Object[string, string]} */(his, room_id) => {
+                div_dest.appendChild(create_history_element(his, room_id))
+            })
+        let chat_log_wrapper = cloned.querySelector('#chat-log');
+        // chat_log_wrapper.innerHTML = '';
+        main.innerHTML = ''; // clear out the old
+
+        chat_log_wrapper.appendChild(div_dest);
+        main.appendChild(cloned);
+
+        chat_input.focus();
+    }
+
+    /**
+     * removes a chat from the history
+     * @param record_id {number}
+     * @param ele {HTMLDivElement}
+     */
+    function delete_history_element(record_id, ele, room_id){
+        ele.remove();
+        console.log(`${record_id} will be deleted`);
+        // TODO: remove chat log from database
+        chatSocket.send(JSON.stringify({
+            'chat_id': record_id,
+            'type': 'delete_message',
+            'room_id': room_id
+        }));
+
+    }
+
+    function edit_history_element(record_id, ele, input, btn){
+        input.innerHTML = ele.querySelector('div[data-role="chat-message"]').innerHTML;
+        let original_func = btn.onclick;
+        btn.onclick = function(e) {
+            const messageInputDom = document.querySelector('#chat-message-input');
+            const message = messageInputDom.value;
+            console.log("CHAT BUTTON SENDING")
+            chatSocket.send(JSON.stringify({
+                'chat_id': record_id,
+                'message': message,
+                'type': 'edit_message'
+            }));
+            messageInputDom.value = '';
+            btn.onclick = original_func
+        };
+    }
+
+    /**
+     * Adds a chat to the history
+     * @param record
+     */
+    function create_history_element(record) {
+        let tmp = /** @type {HTMLTemplateElement} */ document.getElementById('tmpChatBox');
+        let ele = /** @type {HTMLDivElement} */ tmp.content.cloneNode(true);
+        ele = ele.querySelector('div');
+        ele.setAttribute("id", record.id);
+        ele.querySelector('.delete-button').onclick = ()=>{
+            delete_history_element(record.id, ele, record.room_id);
+        };
+        //ele.querySelector('#tmpChatBox').setAttribute("id", "tmpChatBox " + record.id);
+        ele.querySelector('div[data-role="chat-message"]').innerHTML = record.message; // TODO: escape?
+        return ele
+    }
+
+    chatSocket.onmessage = (e) => {
+        const data = JSON.parse(e.data);
+        if (data.room_id !== room_id_global) {
+            return
+        }
+
+        if (data.type === "delete_message") {
+            let ele = document.getElementById(data.chat_id);
+            delete_history_element(data.chat_id, ele, data.room_id);
+        } else if (data.type === "chat_message") {
+            let ele = create_history_element(data)
+            document.querySelector('#chat-log').insertAdjacentElement('afterend', ele);
+        }
+    };
+
+
+</script>
+</body>
+</html>

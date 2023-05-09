@@ -1,0 +1,446 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>Eric Chat v1</title>
+    <link href="/static/chat/css/chat.css" rel="stylesheet"/>
+    <style>
+
+    </style>
+    <link rel="apple-touch-icon" sizes="180x180" href="/static/chat/fav/apple-touch-icon.png">
+    <link rel="icon" type="image/png" sizes="32x32" href="/static/chat/fav/favicon-32x32.png">
+    <link rel="icon" type="image/png" sizes="16x16" href="/static/chat/fav/favicon-16x16.png">
+    <link rel="manifest" href="/static/chat/fav/site.webmanifest">
+    <link rel="mask-icon" href="/static/chat/fav/safari-pinned-tab.svg" color="#5bbad5">
+    <link rel="shortcut icon" href="/static/chat/fav/favicon.ico">
+    <meta name="msapplication-TileColor" content="#da532c">
+    <meta name="msapplication-config" content="/static/chat/fav/browserconfig.xml">
+    <meta name="theme-color" content="#ffffff">
+
+    <!-- our project just needs Font Awesome Solid + Brands -->
+    <link href="/static/chat/fontawesome-free-6.2.0-web/css/fontawesome.css" rel="stylesheet">
+    <link href="/static/chat/fontawesome-free-6.2.0-web/css/brands.css" rel="stylesheet">
+    <link href="/static/chat/fontawesome-free-6.2.0-web/css/solid.css" rel="stylesheet">
+
+    <!-- Some rich text editor -->
+    <link href="https://cdn.quilljs.com/1.3.6/quill.snow.css" rel="stylesheet">
+    <script src="https://cdn.quilljs.com/1.3.6/quill.js"></script>
+</head>
+<body>
+<header style="min-height: 8vh; background: #2b2b88; font-family: Arial;">
+    <h2 id="username">{{ user_name }}'s Friends</h2>
+    <a href="login.html">Back</a>
+</header>
+<div class="master">
+
+    <div class="shadow side-menu">
+        <!--<h2 id="username">{{ user_name }}'s Friends</h2>-->
+        <div id="room_listing_wrapper"></div>
+    </div>
+
+    <picture id="my_brand">
+        <source srcset="/static/chat/images/main_portrait.jpg" media="(orientation: portrait)">
+        <source srcset="/static/chat/images/main_1600.jpg" media="(max-width: 1600px)">
+        <img src="static/chat/images/main.jpg"/>
+    </picture>
+    <div id="Chat_Window"><h2>Something here.</h2></div>
+</div>
+
+
+<template id="room_item">
+    <div class="room_listing">
+
+        <div class="room_listing--icon"></div>
+        <div class="room_listing--text_stuff">
+            <div class="room_listing--name"></div>
+            <div class="room_listing--peoples"></div>
+        </div>
+    </div>
+</template>
+<template id="tmpChatBox">
+    <div class="d-flex flex-column ChatBox">
+        <div data-role="extra-buttons">
+            <div class="button-row">
+
+                <button type="button" class="ellipsis">
+                    <div></div>
+                    <div></div>
+                    <div></div>
+                </button>
+
+                <a class="post-btn" style="" data-role="btn-edit"><i class="fa-solid fa-pen-to-square"></i></a>
+                <a class="post-btn" style="" data-role="btn-trash"><i class="fa fa-trash"></i></a>
+
+
+            </div>
+        </div>
+        <div data-role="chat-message"></div>
+    </div>
+</template>
+<template id="tmpRoom">
+    <div class="d-flex flex-column g-3">
+        <div id="chat-log"></div>
+        <!--        <textarea id="chat-log" cols="100" rows="20" autocomplete="off"></textarea>-->
+        <!--        <input id="chat-message-input" type="text">-->
+        <div class="text-editor">
+            <div id="chat-message-input"></div>
+        </div>
+        <input id="chat-message-submit" type="button" value="Send" style="cursor:pointer">
+    </div>
+</template>
+
+
+{{ user_name|json_script:"user_name"}}
+{{ room_list|json_script:"raw_room_list"}}
+<script>
+    // const username = JSON.parse(document.getElementById('user_name').textContent);
+
+    const raw_room_list = /** @type {Object[]} */ JSON.parse(document.getElementById('raw_room_list').textContent);
+    let current_room_id = /** @type number */ '{{last_room_accessed}}' | 0;
+    // let room_history_list = /** @type {Object[int, Object[string,any][]]} */JSON.parse(document.getElementById('histories').textContent);
+    let quill = null;
+
+    class Chat {
+        /**
+         * Chat Room
+         * @param id {number}
+         * @param message {string}
+         * @param created {Date}
+         * @param room_id {number}
+         * @param current_room_id {number}
+         * @param user_id {number}
+         */
+        constructor(id, message, created, room_id, user_id) {
+            this.id = id;
+            this.message = message;
+            this.created = created; // TODO: to be converted from string to date
+            this.room_id = room_id;
+            this.user_id = user_id;
+        }
+
+        delete() {
+            // remove from GUI
+            let r = room_list.find((r) => r['room_id'] === this.room_id);
+            r.on_delete(this.id);
+
+            /*
+            // Send the message to delete.
+            chatSocket.send(JSON.stringify({
+                'chat_id': this.id,
+                'type': 'delete_message',
+                'room_id': this.room_id
+            }));
+             */
+        }
+
+        edit(message /** {string} **/) {
+            this.message = message
+            let r = room_list.find((r) => r['room_id'] === this.room_id);
+            r.on_edit(this.id)
+        }
+    }
+
+    class Room {
+        /**
+         * A Room
+         * @param room_id {number}
+         * @param title {string}
+         * @param attendant_list {string}
+         * @param history_list {Chat[]}
+         */
+        constructor(room_id, title, attendant_list, history_list) {
+            this.room_id = room_id;
+            this.title = title;
+            this.attendant_list = attendant_list;
+            this.history = history_list;
+        }
+
+        /**
+         * Opens the display for this room
+         */
+        open() {
+            let tmpRoom = /** @type {HTMLTemplateElement} */ document.getElementById('tmpRoom');
+            let cloned = /** @type {HTMLDivElement} */ tmpRoom.content.cloneNode(true);
+            let main = document.getElementById('Chat_Window');
+            let chat_input = cloned.querySelector('#chat-message-input');
+            let btn_send = cloned.querySelector('#chat-message-submit');
+
+            chat_input.onkeyup = (e) => {
+                if (e.keyCode !== 13) {  // enter, return
+                    return;
+                }
+                //console.log("ENTER HIT, NOW SENDING")
+                //document.querySelector('#chat-message-submit').click();
+            };
+
+            btn_send.onclick = () => {
+                const messageInputDom = document.querySelector('#chat-message-input .ql-editor');
+                const message = messageInputDom.innerHTML;
+                console.log("CHAT BUTTON SENDING")
+                chatSocket.send(JSON.stringify({
+                    'room_id': this.room_id,
+                    'message': message,
+                    'type': 'chat_message',
+                    'user_id': "{{ user_id }}"|0
+                }));
+                messageInputDom.innerHTML = '';
+            };
+
+            let div_dest = /** @type {HTMLDivElement} */ document.createElement('div');
+            div_dest.setAttribute("class", "chat-log-container d-flex flex-column g-3");
+
+            this.history.forEach((chat) => {
+                div_dest.appendChild(create_history_element(chat))
+            })
+
+            let chat_log_wrapper = cloned.querySelector('#chat-log');
+            main.innerHTML = ''; // clear out the old
+            chat_log_wrapper.appendChild(div_dest);
+            main.appendChild(cloned);
+            quill = new Quill('#chat-message-input', {
+                theme: 'snow'
+            });
+            chat_input.focus();
+        }
+
+
+        /**
+         * Update GUI that a chat been deleted
+         * @param chat_id {number}
+         */
+        on_delete(chat_id) {
+            let chat = /** @type {Chat} */ this.history.find((chat) => {
+                return chat.id === chat_id;
+            });
+            if (!chat) {
+                // throw Error("Missing Chat?");
+                return; // Chat can be deleted on client side for speed
+            }
+
+            let chat_index = /** @type {int} */ this.history.findIndex((chat) => {
+                return chat.id === chat_id;
+            });
+
+            let chat_div = /** @type {HTMLDivElement|null} */ document.querySelector(`[data-role="chat"][data-id="${chat_id}"]`);
+            if (!chat_div) {
+                throw Error("Missing Chat Div?");
+            }
+
+            chat_div.remove();
+            this.history.splice(chat_index, 1);
+            console.log(`${chat_id} will be deleted`);
+        }
+
+        on_edit(chat_id) {
+            let chat = /** @type {Chat} */ this.history.find((chat) => {
+                return chat.id === chat_id;
+            });
+            if (!chat) {
+                // throw Error("Missing Chat?");
+                return; // Chat can be deleted on client side for speed
+            }
+
+            let chat_div = /** @type {HTMLDivElement|null} */ document.querySelector(`[data-role="chat"][data-id="${chat_id}"]`);
+            if (!chat_div) {
+                throw Error("Missing Chat Div?");
+            }
+
+            chat_div.querySelector('div[data-role="chat-message"]').innerHTML = chat.message;
+            console.log(`${chat_id} will be updated`);
+        }
+    }
+
+    let room_list = /** @param {Room[]} */ raw_room_list.map(/**
+     * @param r {Object}
+     */(r) => {
+
+        let room_id = r.id | 0;
+        let room_title = r.name;
+        let attendant_list = r.attendant_list;
+        let history_list = r['chat_list'].map((dict) => {
+            return new Chat(dict['id'] | 0, dict['message'], dict['created'], room_id, dict['user_id']);
+        });
+
+        return new Room(room_id, room_title, attendant_list, history_list)
+    });
+
+
+    function toggle_rooms()
+    {
+        let toggle_header = document.querySelector('.username');
+        let toggle_wrapper = /** @type {HTMLDivElement} */ document.querySelector('#room_listing_wrapper');
+        function toggleOn(){
+            toggle_wrapper.setAttribute('style', 'display:block');
+            toggle_header.onclick = toggleOff;
+        }
+        function toggleOff(){
+            toggle_wrapper.setAttribute('style', 'display:none')
+            toggle_header.onclick = toggleOn;
+        }
+
+
+        toggle_header.onclick = toggleOff;
+    }
+
+    /**
+     *  Do function to build up rooms in left side.
+     * @param room_list {Room[]}
+     */
+    function build_rooms(room_list) {
+        let div_wrapper = /** @type {HTMLDivElement} */ document.querySelector('#room_listing_wrapper');
+        let tmp = /** @type {HTMLTemplateElement} */ document.getElementById('room_item');
+        room_list.forEach((room /** @type {Room} */) => {
+            let frag = /** @type {DocumentFragment} */ tmp.content.cloneNode(true);
+            let ele = frag.querySelector('div');
+            let ele_icon = ele.querySelector('.room_listing--icon');
+            let ele_name = ele.querySelector('.room_listing--name');
+            let ele_peoples = ele.querySelector('.room_listing--peoples');
+            ele_icon.innerHTML = '';
+            ele_name.innerHTML = room.title;
+            ele_peoples.innerHTML = room.attendant_list;  // TODO: pass this across?
+            ele.onclick = () => {
+                room.open();
+                current_room_id = room.room_id;
+
+                chatSocket.send(JSON.stringify({
+                    'room_id': room.room_id,
+                    'user_id': '{{ user_id }}' | 0,
+                    'type': 'update_preferences'
+                }));
+            };
+            div_wrapper.appendChild(ele);
+        })
+        //toggle_rooms();
+    }
+
+    build_rooms(room_list);
+
+
+    const chatSocket = new WebSocket
+    (
+        'ws://'
+        + window.location.host
+        + '/ws/chat/'
+        + '{{user_name}}'
+        + '/'
+    );
+
+    function edit(chat) {
+        let ele = document.querySelector(`[data-id='${chat.id}']`);
+        ele.querySelector('div[data-role="chat-message"]').innerHTML = chat.message;
+    }
+
+    /**
+     * Edit the chat element, and its associated html element
+     * @param chat {Chat}
+     * @param ele {HTMLDivElement}
+     */
+    function edit_history_element(chat, ele) {
+        let input = document.querySelector('#chat-message-input .ql-editor');
+        input.innerHTML = chat.message;
+        let btn = document.getElementById('chat-message-submit');
+        let original_func = btn.onclick;
+        btn.onclick = (e) => {
+            let messageInputDom = document.querySelector('#chat-message-input .ql-editor');
+            const message = messageInputDom.innerHTML;
+            //const message = messageInputDom.value;
+            chat.edit(message);
+
+
+            console.log("CHAT BUTTON SENDING")
+            chatSocket.send(JSON.stringify({
+                'chat_id': chat.id,
+                'message': message,
+                'room_id': chat.room_id,
+                'type': 'edit_message'
+            }));
+            messageInputDom.innerHTML = '';
+            //ele.querySelector('div[data-role="chat-message"]').innerHTML = message;
+            btn.onclick = original_func;
+        };
+    }
+
+    /**
+     * Adds a chat to the history
+     * @param chat {Chat}
+     */
+    function create_history_element(chat) {
+        let tmp = /** @type {HTMLTemplateElement} */ document.getElementById('tmpChatBox');
+        let ele = /** @type {HTMLDivElement} */ tmp.content.cloneNode(true);
+        ele = ele.querySelector('div');
+        ele.setAttribute("id", `${chat.id}`);
+        ele.dataset["role"] = 'chat';
+        ele.dataset["id"] = `${chat.id}`;
+
+        ele.querySelector('a[data-role="btn-trash"]').onclick = () => {
+            chat.delete();
+            // Send the message to delete.
+            chatSocket.send(JSON.stringify({
+                'chat_id': chat.id,
+                'type': 'delete_message',
+                'room_id': chat.room_id
+            }));
+
+            // delete_history_element(chat.id, ele, chat.room_id);
+        };
+
+        ele.querySelector('a[data-role="btn-edit"]').onclick = () => {
+            edit_history_element(chat, ele);
+            // delete_history_element(chat.id, ele, chat.room_id);
+        };
+
+
+        let ellipsis = /** @type {HTMLDivElement} */ ele.querySelector('.ellipsis');
+        ellipsis.addEventListener('click', () => {
+            ellipsis.parentElement.classList.toggle('open-state');
+
+            //let ellip = /** @type {HTMLElement[]} */ [...ele.querySelectorAll('.post-btn')];
+
+        });
+
+        //ele.querySelector('#tmpChatBox').setAttribute("id", "tmpChatBox " + record.id);
+        ele.querySelector('div[data-role="chat-message"]').innerHTML = chat.message; // TODO: escape?
+        return ele
+    }
+
+    chatSocket.onmessage = (e) => {
+        //debugger;
+        const data = JSON.parse(e.data);
+        let room = /** @type {Room} */ room_list.find((r) => r['room_id'] === data['room_id'] | 0);
+        if (!room) {
+            throw Error("Unknown Room");
+        }
+        let chat = room.history.find((c) => c.id === data.chat_id);
+        if (!chat && data.type != "chat_message") {
+            // throw Error("Failed to find the cookies");
+            return;
+        }
+        //debugger;
+        switch (data.type) {
+            case "delete_message":
+                // find the message
+                chat.delete();
+                break;
+            case "chat_message":
+                let c = new Chat(data.chat_id, data.message, data.created, room.room_id, data.user_id);
+                room.history.push(c);
+                console.log('pushing c, room_id, current', c, room.room_id, current_room_id)
+                if (room.room_id !== current_room_id)
+                    break;
+                let ele = create_history_element(c);
+                document.querySelector('.chat-log-container').insertAdjacentElement('beforeend', ele);
+                break;
+            case "edit_message":
+                chat.edit(data.message);
+                break;
+            default:
+                throw Error("The lemming iz jumping")
+        }
+
+    };
+
+    room_list.find((r) => current_room_id === r.room_id).open();
+
+</script>
+</body>
+</html>

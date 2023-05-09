@@ -1,0 +1,11 @@
+asgiref
+cffi
+cryptography
+Django>=4
+pycparser
+pytz==2022.2.1
+six
+sqlparse
+typing-extensions
+
+channels~=3.0.5
